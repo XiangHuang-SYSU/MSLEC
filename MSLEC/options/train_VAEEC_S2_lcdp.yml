@@ -1,0 +1,155 @@
+# general settings
+name: train_lcdp_S2
+model_type: MSRestoreXS2Model
+scale: 1
+num_gpu: auto  # auto: can infer from your visible devices automatically. official: 4 GPUs
+manual_seed: 0
+find_unused_parameters: true
+
+# dataset and data loader settings
+datasets:
+  train:
+    name: TrainSet
+    type: PairedDataset
+    dataroot_gt: /home/huangxiang/codes/hx/computer_vision/low_level/low_level_data/LCDP/lcdp_dataset_crop/train_crops_512/target_crops
+    dataroot_lq: /home/huangxiang/codes/hx/computer_vision/low_level/low_level_data/LCDP/lcdp_dataset_crop/train_crops_512/input_crops
+    geometric_augs: true
+
+    filename_tmpl: '{}'
+    io_backend:
+      type: disk
+
+
+    num_worker_per_gpu: 2
+    batch_size_per_gpu: 1
+    gt_size: 512   # Max patch size for progressive training
+    minigt_sizes: 512
+
+    # data loader
+    use_shuffle: true
+    dataset_enlarge_ratio: 1
+    prefetch_mode: ~
+
+  # Uncomment these for validation
+  val:
+    name: ValSet
+    type: PairedDataset
+    dataroot_lq: your-path/LCDP/lcdp_dataset/valid-input
+    dataroot_gt: your-path/LCDP/lcdp_dataset/valid-gt
+    
+    io_backend:
+      type: disk
+
+# network structures
+network_g:
+  type: MSRestoreXS2
+  inp_channels: 3
+  out_channels: 3
+  dim: 48
+  num_blocks: [1,1,1,1]
+  num_refinement_blocks: 1
+  heads: [1,2,4,8]
+  ffn_expansion_factor: 2
+  bias: False
+  LayerNorm_type: WithBias
+  patch_nums: [1, 4, 8, 16]
+  vae_ckpt: your-path/VAR-main/vae_ch160v4096z32.pth
+  linear_start: 0.1
+  linear_end: 0.99
+  timesteps: 4
+
+# network structures
+network_S1:
+  type: MSRestoreXS1
+  inp_channels: 3
+  out_channels: 3
+  dim: 48
+  num_blocks: [1,1,1,1]
+  num_refinement_blocks: 1
+  heads: [1,2,4,8]
+  ffn_expansion_factor: 2
+  bias: False
+  LayerNorm_type: WithBias
+  patch_nums: [1, 4, 8, 16]
+  vae_ckpt: your-path/vae_ch160v4096z32.pth
+
+
+
+# path
+path:
+  pretrain_network_g: experiments/train_lcdp_S1/models/net_g_300000.pth
+  pretrain_network_S1: experiments/train_lcdp_S1/models/net_g_300000.pth
+  param_key_g: params_ema
+  strict_load_g: False
+  resume_state: ~
+  ignore_resume_networks: network_S1
+
+# training settings
+train:
+  ema_decay: 0.999
+
+  optim_g:
+    type: Adam
+    lr: !!float 1e-4
+    weight_decay: 0
+    betas: [0.9, 0.99]
+
+  scheduler:
+    type: MultiStepLR
+    milestones: [100000]
+    gamma: 0.5
+
+  encoder_iter: 100001
+  total_iter: 200000
+  warmup_iter: -1  # no warm up
+  
+  # losses
+  pixel_opt:
+    type: L1Loss
+    loss_weight: 1.0
+    reduction: mean
+  
+  prior1_opt:
+    type: PriorLoss1
+    loss_weight: 100.0
+
+  prior2_opt:
+    type: PriorLoss2
+    loss_weight: 10.0
+    
+  msvq_opt:
+    type: MSVAELoss
+    vae_ckpt: your-path/VAR-main/vae_ch160v4096z32.pth
+    loss_weight1: 0.01
+    loss_weight2: 0.01
+  
+# Uncomment these for validation
+# validation settings
+val:
+  window_size: 8
+  val_freq: !!float 5e3
+  save_img: False
+
+  metrics:
+    psnr: # metric name
+      type: calculate_psnr
+      crop_border: 0
+      test_y_channel: false
+    ssim: # metric name
+      type: calculate_ssim
+      crop_border: 0
+      test_y_channel: False
+
+# logging settings
+logger:
+  print_freq: 1000
+  save_checkpoint_freq: !!float 5e3
+  use_tb_logger: true
+  wandb:
+    project: ~
+    resume_id: ~
+
+# dist training settings
+dist_params:
+  backend: nccl
+  port: 29500

@@ -1,0 +1,120 @@
+# general settings
+name: train_lcdp_S1
+model_type: MSRestoreXS1Model
+scale: 1
+num_gpu: auto  # auto: can infer from your visible devices automatically. official: 8 GPUs
+manual_seed: 0
+find_unused_parameters: true
+
+# dataset and data loader settings
+datasets:
+  train:
+    name: TrainSet
+    type: PairedDataset
+    dataroot_gt: your-path/LCDP/lcdp_dataset_crop/train_crops_512/target_crops
+    dataroot_lq: your-path/LCDP/lcdp_dataset_crop/train_crops_512/input_crops
+    geometric_augs: true
+
+    filename_tmpl: '{}'
+    io_backend:
+      type: disk
+
+
+    num_worker_per_gpu: 2
+    batch_size_per_gpu: 1
+    gt_size: 512   # Max patch size
+    minigt_sizes: 256
+
+    # data loader
+    use_shuffle: true
+    dataset_enlarge_ratio: 1
+    prefetch_mode: ~
+
+  # Uncomment these for validation
+  val:
+    name: ValSet
+    type: PairedDataset
+    dataroot_lq: your-path/LCDP/lcdp_dataset/valid-input
+    dataroot_gt: your-path/LCDP/lcdp_dataset/valid-gt
+    io_backend:
+      type: disk
+
+# network structures
+network_g:
+  type: MSRestoreXS1
+  inp_channels: 3
+  out_channels: 3
+  dim: 48
+  num_blocks: [1,1,1,1]
+  num_refinement_blocks: 1
+  heads: [1,2,4,8]
+  ffn_expansion_factor: 2
+  bias: False
+  LayerNorm_type: WithBias
+  patch_nums: [1, 4, 8, 16]
+  vae_ckpt: your-path/vae_ch160v4096z32.pth
+  
+
+# path
+path:
+  pretrain_network_g: ~
+  param_key_g: params_ema
+  strict_load_g: true
+  resume_state: ~
+
+# training settings
+train:
+  ema_decay: 0.999
+
+  optim_g:
+    type: Adam
+    lr: !!float 2e-4
+    weight_decay: 0
+    betas: [0.9, 0.999]
+
+  scheduler:
+    type: CosineAnnealingRestartCyclicLR
+    periods: [200000, 400000]       
+    restart_weights: [1,1]
+    eta_mins: [0.000205,0.000001]
+
+  total_iter: 600000
+  warmup_iter: -1  # no warm up
+
+  # losses
+  pixel_opt:
+    type: L1Loss
+    loss_weight: 1.0
+    reduction: mean
+  
+  
+
+# Uncomment these for validation
+# validation settings
+val:
+  val_freq: !!float 1e4
+  save_img: False
+
+  metrics:
+    psnr: # metric name
+      type: calculate_psnr
+      crop_border: 0
+      test_y_channel: false
+    ssim: # metric name
+      type: calculate_ssim
+      crop_border: 0
+      test_y_channel: False
+
+# logging settings
+logger:
+  print_freq: 1000
+  save_checkpoint_freq: !!float 1e4
+  use_tb_logger: true
+  wandb:
+    project: ~
+    resume_id: ~
+
+# dist training settings
+dist_params:
+  backend: nccl
+  port: 29500

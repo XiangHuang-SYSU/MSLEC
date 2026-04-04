@@ -1,0 +1,83 @@
+# general settings
+name: test_lcdp_S2
+model_type: CLIPRestoreXS2Model
+scale: 1
+num_gpu: auto  # auto: can infer from your visible devices automatically. official: 4 GPUs
+manual_seed: 0
+
+
+# dataset and data loader settings
+datasets:
+  # Uncomment these for validation
+  val_1:
+    name: lcdp
+    type: PairedDataset
+    dataroot_gt: your-path/LCDP/lcdp_dataset_crop/val_crops_512/target_crops
+    dataroot_lq: your-path/LCDP/lcdp_dataset_crop/val_crops_512/input_crops
+    io_backend:
+      type: disk
+
+
+# network structures
+network_g:
+  type: CLIPRestoreXS2
+  inp_channels: 3
+  out_channels: 3
+  dim: 48
+  num_blocks: [1,1,1,1]
+  num_refinement_blocks: 1
+  heads: [1,2,4,8]
+  ffn_expansion_factor: 2
+  bias: False
+  LayerNorm_type: WithBias
+  #patch_nums: [1, 2, 3, 4, 6, 9, 13, 18, 24, 32]
+  patch_nums: [1, 4, 8, 16]
+  vae_ckpt: your-path/vae_ch160v4096z32.pth
+  linear_start: 0.1
+  linear_end: 0.99
+  timesteps: 4
+
+# network structures
+network_S1:
+  type: CLIPRestoreXS1
+  inp_channels: 3
+  out_channels: 3
+  dim: 48
+  num_blocks: [1,1,1,1]
+  num_refinement_blocks: 1
+  heads: [1,2,4,8]
+  ffn_expansion_factor: 2
+  bias: False
+  LayerNorm_type: WithBias
+  patch_nums: [1, 4, 8, 16]
+  vae_ckpt: your-path/vae_ch160v4096z32.pth
+  
+
+# path
+path:
+  # use the pre-trained Real-ESRNet model
+  pretrain_network_g: experiments/train_lcdp_S2/models/net_g_105000.pth
+  pretrain_network_S1: experiments/train_lcdp_S1/models/net_g_300000.pth
+  param_key_g: params_ema
+  strict_load_g: False
+  ignore_resume_networks: network_S1
+
+
+
+val:
+  save_img: True
+  suffix: ~  # add suffix to saved images, if None, use exp name
+  window_size: 8
+
+  metrics:
+    psnr: # metric name
+      type: calculate_psnr
+      crop_border: 0
+      test_y_channel: False
+    ssim: # metric name
+      type: calculate_ssim
+      crop_border: 0
+      test_y_channel: False
+
+
+
