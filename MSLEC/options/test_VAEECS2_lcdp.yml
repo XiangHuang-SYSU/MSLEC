@@ -1,6 +1,6 @@
 # general settings
 name: test_lcdp_S2
-model_type: CLIPRestoreXS2Model
+model_type: MSRestoreXS2Model
 scale: 1
 num_gpu: auto  # auto: can infer from your visible devices automatically. official: 4 GPUs
 manual_seed: 0
@@ -20,7 +20,7 @@ datasets:
 
 # network structures
 network_g:
-  type: CLIPRestoreXS2
+  type: MSRestoreXS2
   inp_channels: 3
   out_channels: 3
   dim: 48
@@ -39,7 +39,7 @@ network_g:
 
 # network structures
 network_S1:
-  type: CLIPRestoreXS1
+  type: MSRestoreXS1
   inp_channels: 3
   out_channels: 3
   dim: 48
